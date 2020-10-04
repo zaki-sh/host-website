@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Cloudfront distribution for serving website.
+Resources:
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !ImportValue rootDomainName
+      SubjectAlternativeNames: 
+      - !Sub 
+        - '*.${rootDomainName}'
+        - rootDomainName: !ImportValue rootDomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !ImportValue rootDomainName
+          HostedZoneId: !ImportValue rootHostedZoneID
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 
+        - 'Cloudfront OAI for ${rootDomainName}'
+        - rootDomainName: !ImportValue rootDomainName
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: 'true'
+        Origins:
+        - DomainName: !Sub 
+          - '${rootDomainName}.s3.amazonaws.com'
+          - rootDomainName: !ImportValue rootDomainName
+          Id: rootS3Origin
+          S3OriginConfig:
+            OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
+        Comment: Prod Distribution
+        DefaultRootObject: index.html
+        Aliases:
+        - !ImportValue rootDomainName
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: all
+          TargetOriginId: rootS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+        PriceClass: PriceClass_200
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          MinimumProtocolVersion: TLSv1
+          SslSupportMethod: sni-only
+  RecordSetGroup:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !ImportValue rootHostedZoneID
+      Comment: Zone apex alias.
+      # For AliasTarget, `Z2FDTNDATAQYW2` is always the hosted zone ID when you create an alias record that routes traffic to a CloudFront. distribution. 
+      # Source: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-aliastarget.html#cfn-route53-aliastarget-hostedzoneid
+      RecordSets:
+      - Name: !ImportValue rootDomainName
+        Type: A
+        AliasTarget:
+          HostedZoneId: Z2FDTNDATAQYW2
+          DNSName: !GetAtt Distribution.DomainName
+      - Name: !Sub
+        - www.${rootDomainName}
+        - rootDomainName: !ImportValue rootDomainName
+        Type: A
+        AliasTarget:
+          HostedZoneId: Z2FDTNDATAQYW2
+          DNSName: !GetAtt Distribution.DomainName
+Outputs:
+  cloudfrontOaiUserId:
+    Value: !Ref CloudFrontOriginAccessIdentity
+    Description: Cloudfront OAI user ID
+    Export:
+      Name: cloudfrontOaiUserId
+  cloudfrontOaiS3CanonicalUserId:
+    Value: !GetAtt [CloudFrontOriginAccessIdentity, S3CanonicalUserId]
+    Description: Cloudfront OAI S3 canonical user ID
+    Export:
+      Name: cloudfrontOaiS3CanonicalUserId
