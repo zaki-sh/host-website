@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  S3 buckets for hosting static website.
+Resources:
+  RootBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !ImportValue rootDomainName
+      AccessControl: Private
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      PolicyDocument:
+        Id: Public read policy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PolicyForCloudFrontPrivateContent
+            Effect: Allow
+            Principal: 
+              AWS: !Sub
+                - 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${cloudfrontOaiUserId}'
+                - cloudfrontOaiUserId: !ImportValue cloudfrontOaiUserId
+            Action: s3:GetObject
+            Resource: !Join 
+            - ''
+            - - 'arn:aws:s3:::'
+              - !Ref RootBucket
+              - /*
+      Bucket: !Ref RootBucket
