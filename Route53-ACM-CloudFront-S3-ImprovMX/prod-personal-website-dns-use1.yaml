@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  DNS updates for personal website.
+Parameters:
+  RootDomainName:
+    Description: Website domain name
+    Type: String
+Resources:
+  HostedZone:
+    Type: 'AWS::Route53::HostedZone'
+    Properties:
+      Name: !Ref RootDomainName
+  RecordSetGroup:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref HostedZone
+      Comment: Zone apex alias.
+      RecordSets:
+      - Name: !Ref RootDomainName
+        ResourceRecords: 
+        - '10 mx1.improvmx.com.'
+        - '20 mx2.improvmx.com.'
+        TTL: '300'
+        Type: MX
+      - Name: !Ref RootDomainName
+        ResourceRecords: 
+        - '"v=spf1 include:spf.improvmx.com ~all"'
+        TTL: '300'
+        Type: TXT
+Outputs:
+  RootDomain:
+    Value: !Ref RootDomainName
+    Description: Domain name for personal website
+    Export:
+      Name: rootDomainName
+  HostedZoneID:
+    Value: !Ref HostedZone
+    Description: HostedZoneID
+    Export:
+      Name: rootHostedZoneID
