@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Cloudfront distribution for serving website.
+Parameters:
+  RootDomainName:
+    Description: Website domain name
+    Type: String
+Resources:
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref RootDomainName
+      SubjectAlternativeNames: 
+      - !Sub '*.${RootDomainName}'
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref RootDomainName
+          ValidationDomain: !Ref RootDomainName
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 'Cloudfront OAI for ${RootDomainName}'
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: 'true'
+        Origins:
+        - DomainName: !Sub '${RootDomainName}.s3.amazonaws.com'
+          Id: rootS3Origin
+          S3OriginConfig:
+            OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
+        Comment: Prod Distribution
+        DefaultRootObject: index.html
+        Aliases:
+        - !Ref RootDomainName
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: all
+          TargetOriginId: rootS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+        PriceClass: PriceClass_200
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          MinimumProtocolVersion: TLSv1
+          SslSupportMethod: sni-only
+Outputs:
+  certificateArn:
+    Value: !Ref Certificate
+    Description: SSL Certificate arn
+    Export:
+      Name: certificateArn
+  cloudfrontOaiUserId:
+    Value: !Ref CloudFrontOriginAccessIdentity
+    Description: Cloudfront OAI user ID
+    Export:
+      Name: cloudfrontOaiUserId
+  cloudfrontOaiS3CanonicalUserId:
+    Value: !GetAtt [CloudFrontOriginAccessIdentity, S3CanonicalUserId]
+    Description: Cloudfront OAI S3 canonical user ID
+    Export:
+      Name: cloudfrontOaiS3CanonicalUserId
+  cloudFrontDistributionId:
+    Value: !Ref Distribution
+    Description: CloudFront distribution ID
+    Export:
+      Name: cloudFrontDistributionId
+  cloudFrontDistributionDomainName:
+    Value: !GetAtt Distribution.DomainName
+    Description: CloudFront distribution Domain Name
+    Export:
+      Name: cloudFrontDistributionDomainName
